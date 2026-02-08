@@ -48,23 +48,55 @@ def show_user(user_id: int, profile: dict) -> None:
 
 
 def handle_search(user_id: int) -> None:
-    # 🔥 НИКАКИХ ПРОВЕРОК ПРОФИЛЯ
-    CITY_ID = 1          # Москва
-    TARGET_SEX = 1       # девушки
-    AGE_FROM = 20
-    AGE_TO = 30
+    user_info = vk_user.get_user_info(user_id)
+
+    if not isinstance(user_info, dict) or not user_info:
+        send_message(user_id, "Не удалось получить данные профиля 😢")
+        return
+
+    # --- ЯВНАЯ ПРОВЕРКА ДАННЫХ ---
+    if "sex" not in user_info or user_info["sex"] not in (1, 2):
+        send_message(user_id, "Укажи пол в профиле VK и попробуй снова 🙂")
+        return
+
+    if "city" not in user_info or not user_info["city"]:
+        send_message(user_id, "Укажи город в профиле VK и попробуй снова 🙂")
+        return
+
+    if "bdate" not in user_info:
+        send_message(user_id, "Укажи дату рождения в профиле VK и попробуй снова 🙂")
+        return
+
+    sex = user_info["sex"]
+    city = user_info["city"]
+    bdate = user_info["bdate"]
+
+    # город может быть dict или int
+    if isinstance(city, dict):
+        city_id = city.get("id")
+    else:
+        city_id = city
+
+    if not city_id:
+        send_message(user_id, "Не удалось определить город 😕")
+        return
+
+    parts = bdate.split(".")
+    if len(parts) != 3:
+        send_message(user_id, "Дата рождения должна быть указана с годом 😕")
+        return
+
+    birth_year = int(parts[2])
+    age = datetime.now().year - birth_year
+
+    target_sex = 1 if sex == 2 else 2
 
     results = vk_user.search_users(
-        sex=TARGET_SEX,
-        city_id=CITY_ID,
-        age_from=AGE_FROM,
-        age_to=AGE_TO
+        sex=target_sex,
+        city_id=city_id,
+        age_from=age - 2,
+        age_to=age + 2
     )
-
-    results = [
-        r for r in results
-        if isinstance(r, dict) and isinstance(r.get("id"), int)
-    ]
 
     if not results:
         send_message(user_id, "Никого не найдено 😔")
@@ -74,6 +106,7 @@ def handle_search(user_id: int) -> None:
     search_offsets[user_id] = 0
 
     show_user(user_id, results[0])
+
 
 
 def handle_next(user_id: int) -> None:
